@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מערכת ניהול קודי תדלוק</title>
+<style>
+:root {
+  --ink:      #0F1923;
+  --ink2:     #1E2D3D;
+  --fuel:     #E8630A;
+  --fuel-lt:  #F5924A;
+  --fuel-pale:#FEF0E6;
+  --steel:    #2C5F8A;
+  --steel-lt: #4A87B5;
+  --foam:     #E8F3FB;
+  --ok:       #1A7A4A;
+  --ok-bg:    #E6F5ED;
+  --warn:     #C25A00;
+  --warn-bg:  #FEF0E6;
+  --err:      #B52A1E;
+  --err-bg:   #FCECEA;
+  --border:   #D5DCE4;
+  --bg:       #F4F6F9;
+  --white:    #FFFFFF;
+  --muted:    #6B7A8D;
+  --r:        10px;
+  --sh:       0 2px 14px rgba(15,25,35,0.09);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;direction:rtl;}
+
+/* ── HEADER ── */
+.hdr{background:linear-gradient(135deg,var(--ink) 0%,var(--ink2) 100%);color:#fff;padding:0;position:sticky;top:0;z-index:200;box-shadow:0 3px 20px rgba(0,0,0,.3);}
+.hdr-inner{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;}
+.hdr-brand{display:flex;align-items:center;gap:12px;}
+.hdr-brand .icon{width:42px;height:42px;background:var(--fuel);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;}
+.hdr-brand .name{font-size:17px;font-weight:800;letter-spacing:.2px;}
+.hdr-brand .sub{font-size:11px;color:rgba(255,255,255,.55);margin-top:2px;}
+.hdr-stats{display:flex;gap:20px;}
+.hdr-stat{text-align:center;}
+.hdr-stat .sv{font-size:22px;font-weight:800;color:var(--fuel-lt);}
+.hdr-stat .sl{font-size:10px;color:rgba(255,255,255,.55);margin-top:1px;}
+.nav-bar{display:flex;padding:0 8px;border-top:1px solid rgba(255,255,255,.08);overflow-x:auto;scrollbar-width:none;}
+.nav-bar::-webkit-scrollbar{display:none;}
+.nav-btn{flex-shrink:0;background:none;border:none;color:rgba(255,255,255,.55);padding:10px 16px 9px;font-size:13px;font-weight:600;cursor:pointer;border-bottom:3px solid transparent;transition:.2s;font-family:inherit;white-space:nowrap;}
+.nav-btn.on{color:#fff;border-bottom-color:var(--fuel);}
+
+/* ── LAYOUT ── */
+main{max-width:900px;margin:0 auto;padding:20px 16px;}
+.tab{display:none;}
+.tab.on{display:block;}
+
+/* ── CARD ── */
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:20px;overflow:hidden;}
+.card-hdr{background:linear-gradient(90deg,var(--steel),var(--steel-lt));padding:14px 18px;display:flex;align-items:center;gap:10px;}
+.card-hdr .ci{font-size:20px;}
+.card-hdr .ct{color:#fff;font-size:15px;font-weight:700;}
+.card-hdr .cs{color:rgba(255,255,255,.7);font-size:11px;margin-top:2px;}
+.card-body{padding:20px;}
+
+/* ── FORM ── */
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--steel);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px;}
+.field label .req{color:var(--err);}
+.field input,.field select,.field textarea{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;direction:rtl;background:var(--white);color:var(--ink);transition:.2s;}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--steel-lt);box-shadow:0 0 0 3px rgba(74,135,181,.12);}
+.field textarea{resize:vertical;min-height:70px;}
+.field .hint{font-size:11px;color:var(--muted);margin-top:4px;}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:13px 22px;border-radius:9px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border:none;transition:.15s;width:100%;}
+.btn-fuel{background:linear-gradient(135deg,var(--fuel),var(--fuel-lt));color:#fff;box-shadow:0 3px 12px rgba(232,99,10,.35);}
+.btn-fuel:active{transform:scale(.98);}
+.btn-wa{background:linear-gradient(135deg,#128C7E,#25D366);color:#fff;box-shadow:0 3px 12px rgba(37,211,102,.3);}
+.btn-steel{background:var(--steel);color:#fff;}
+.btn-outline{background:var(--white);color:var(--steel);border:2px solid var(--steel);}
+.btn-sm{padding:7px 14px;font-size:13px;width:auto;}
+.btn-danger{background:var(--err);color:#fff;}
+.btn-row{display:flex;gap:10px;}
+.btn-row .btn{flex:1;}
+
+/* ── RESULT BOX ── */
+.result-box{background:var(--ok-bg);border:2px solid var(--ok);border-radius:10px;padding:16px 18px;margin-top:16px;display:none;}
+.result-box.show{display:block;}
+.result-box.err{background:var(--err-bg);border-color:var(--err);}
+.result-box.warn{background:var(--warn-bg);border-color:var(--warn);}
+.result-title{font-size:14px;font-weight:800;margin-bottom:8px;}
+.result-title.ok{color:var(--ok);}
+.result-title.err{color:var(--err);}
+.result-title.warn{color:var(--warn);}
+.result-row{font-size:14px;margin-bottom:4px;display:flex;gap:8px;}
+.result-row strong{color:var(--ink);}
+.code-pill{display:inline-block;background:var(--ink);color:#fff;font-size:22px;font-weight:800;padding:8px 20px;border-radius:8px;letter-spacing:2px;margin:8px 0;}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+.b-free{background:var(--ok-bg);color:var(--ok);}
+.b-used{background:var(--foam);color:var(--steel);}
+.b-cancel{background:var(--err-bg);color:var(--err);}
+.b-expire{background:#F3F4F6;color:var(--muted);}
+
+/* ── TABLE ── */
+.tbl-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{background:var(--ink2);color:#fff;padding:10px 12px;text-align:right;font-weight:700;white-space:nowrap;}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:hover td{background:var(--foam);}
+tr:last-child td{border-bottom:none;}
+.td-code{font-family:monospace;font-size:14px;font-weight:700;color:var(--ink);}
+.td-wa a{color:var(--ok);text-decoration:none;font-weight:700;}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px;}
+.kpi{background:var(--white);border:1px solid var(--border);border-radius:var(--r);padding:16px;text-align:center;box-shadow:var(--sh);}
+.kpi.accent{background:linear-gradient(135deg,var(--ink),var(--ink2));}
+.kpi .kv{font-size:32px;font-weight:800;color:var(--ink);}
+.kpi.accent .kv{color:var(--fuel-lt);}
+.kpi .kl{font-size:11px;color:var(--muted);font-weight:600;margin-top:3px;}
+.kpi.accent .kl{color:rgba(255,255,255,.6);}
+.kpi .km{font-size:12px;color:var(--muted);margin-top:2px;}
+
+/* ── ALERT ── */
+.alert{display:none;border-radius:9px;padding:12px 16px;margin-bottom:16px;font-size:14px;font-weight:600;}
+.alert.show{display:flex;align-items:center;gap:10px;}
+.alert-warn{background:var(--warn-bg);color:var(--warn);border:1px solid #F5C69A;}
+.alert-err{background:var(--err-bg);color:var(--err);border:1px solid #F5BDBA;}
+
+/* ── LOG ITEM ── */
+.log-item{border:1px solid var(--border);border-radius:9px;padding:12px 14px;margin-bottom:10px;background:var(--white);}
+.log-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.log-code{font-family:monospace;font-size:14px;font-weight:800;color:var(--ink);}
+.log-meta{font-size:12px;color:var(--muted);}
+
+/* ── REPORT TABLE ── */
+.report-section{margin-bottom:24px;}
+.report-title{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid var(--border);}
+.rep-row{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:7px;margin-bottom:4px;}
+.rep-row:nth-child(odd){background:var(--bg);}
+.rep-key{font-size:13px;color:var(--muted);}
+.rep-val{font-size:15px;font-weight:800;color:var(--ink);}
+.rep-val.fuel{color:var(--fuel);}
+
+/* ── MODAL ── */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--white);border-radius:18px 18px 0 0;padding:22px 20px 36px;width:100%;max-width:600px;}
+.modal-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px;}
+.modal-title{font-size:17px;font-weight:800;color:var(--ink);margin-bottom:18px;}
+
+/* ── TOAST ── */
+.toast{display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:30px;font-size:14px;font-weight:700;z-index:600;box-shadow:0 4px 20px rgba(0,0,0,.2);white-space:nowrap;}
+.toast.show{display:block;animation:fiu .3s;}
+.toast-ok{background:var(--ok);color:#fff;}
+.toast-err{background:var(--err);color:#fff;}
+@keyframes fiu{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:16px 0;}
+.empty{text-align:center;padding:40px 20px;color:var(--muted);}
+.empty .ei{font-size:44px;margin-bottom:10px;}
+.section-lbl{font-size:13px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;}
+@media(max-width:520px){.g2,.g3{grid-template-columns:1fr;}.hdr-stats{gap:12px;}.hdr-stat .sv{font-size:18px;}}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="hdr">
+  <div class="hdr-inner">
+    <div class="hdr-brand">
+      <div class="icon">⛽</div>
+      <div>
+        <div class="name">ניהול קודי תדלוק</div>
+        <div class="sub">Fuel Code Management System</div>
+      </div>
+    </div>
+    <div class="hdr-stats">
+      <div class="hdr-stat"><div class="sv" id="statFree">—</div><div class="sl">פנויים</div></div>
+      <div class="hdr-stat"><div class="sv" id="statUsed">—</div><div class="sl">נופקו</div></div>
+      <div class="hdr-stat"><div class="sv" id="statVal">—</div><div class="sl">שווי ₪</div></div>
+    </div>
+  </div>
+  <nav class="nav-bar">
+    <button class="nav-btn on" onclick="showTab('dispense',this)">⛽ ניפוק</button>
+    <button class="nav-btn" onclick="showTab('codes',this)">🗂️ מאגר קודים</button>
+    <button class="nav-btn" onclick="showTab('log',this)">📋 יומן</button>
+    <button class="nav-btn" onclick="showTab('report',this)">📊 דוח</button>
+    <button class="nav-btn" onclick="showTab('settings',this)">⚙️ הגדרות</button>
+  </nav>
+</header>
+
+<main>
+
+<!-- ══════════════════════════════════════
+     TAB: DISPENSE
+══════════════════════════════════════ -->
+<div class="tab on" id="tab-dispense">
+
+  <div class="alert alert-warn" id="lowStockAlert">
+    <span>⚠️</span><span id="lowStockMsg">מלאי קודים נמוך!</span>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <span class="ci">⛽</span>
+      <div>
+        <div class="ct">ניפוק קוד תדלוק</div>
+        <div class="cs">הזן פרטי עובד ורכב ולחץ "נפק קוד"</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="g2">
+        <div class="field">
+          <label>מס׳ רישוי קבוע <span class="req">*</span></label>
+          <input type="text" id="dLicPerm" placeholder="לדוגמה: 12-345-67">
+        </div>
+        <div class="field">
+          <label>מס׳ רישוי חליפי</label>
+          <input type="text" id="dLicAlt" placeholder="אם רלוונטי">
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field">
+          <label>שם עובד <span class="req">*</span></label>
+          <input type="text" id="dWorker" placeholder="שם מלא">
+        </div>
+        <div class="field">
+          <label>טלפון עובד <span class="req">*</span></label>
+          <input type="tel" id="dPhone" placeholder="05X-XXXXXXX">
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field">
+          <label>סוג דלק <span class="req">*</span></label>
+          <select id="dFuelType">
+            <option value="">-- בחר --</option>
+            <option>בנזין</option>
+            <option>סולר</option>
+            <option>אחר</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>מנפיק (מייל)</label>
+          <input type="email" id="dOperator" placeholder="user@example.com">
+        </div>
+      </div>
+      <div class="field">
+        <label>הערות</label>
+        <textarea id="dNotes" placeholder="הערות תפעוליות (אופציונלי)"></textarea>
+      </div>
+
+      <button class="btn btn-fuel" onclick="dispenseCode()">⛽ נפק קוד תדלוק</button>
+
+      <!-- RESULT -->
+      <div class="result-box" id="dispResult">
+        <div class="result-title ok">✅ קוד נופק בהצלחה</div>
+        <div class="code-pill" id="dispCode">—</div>
+        <div class="result-row">💳 <span>כרטיס:</span> <strong id="dispCard">—</strong></div>
+        <div class="result-row">💰 <span>ערך:</span> <strong id="dispVal">—</strong></div>
+        <div class="result-row">⛽ <span>סוג דלק:</span> <strong id="dispFuel">—</strong></div>
+        <div class="result-row">🚗 <span>רישוי:</span> <strong id="dispLic">—</strong></div>
+        <div class="result-row">👤 <span>עובד:</span> <strong id="dispWorker">—</strong></div>
+        <div class="result-row">🆔 <span>מזהה פעולה:</span> <strong id="dispId">—</strong></div>
+        <div class="divider"></div>
+        <button class="btn btn-wa" id="dispWaBtn" onclick="">📲 שלח WhatsApp לנהג</button>
+      </div>
+
+      <!-- DUPLICATE WARNING -->
+      <div class="result-box warn" id="dupWarning">
+        <div class="result-title warn">⚠️ אזהרת כפילות</div>
+        <div id="dupMsg"></div>
+        <div class="divider"></div>
+        <div class="btn-row" style="margin-top:8px">
+          <button class="btn btn-danger btn-sm" onclick="forceDispense()">✅ אשר ניפוק חריג</button>
+          <button class="btn btn-outline btn-sm" onclick="cancelDispense()">❌ בטל</button>
+        </div>
+      </div>
+
+      <div class="result-box err" id="dispError">
+        <div class="result-title err" id="dispErrorMsg">שגיאה</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: CODES
+══════════════════════════════════════ -->
+<div class="tab" id="tab-codes">
+
+  <div class="card">
+    <div class="card-hdr">
+      <span class="ci">➕</span>
+      <div><div class="ct">הוספת קודים</div><div class="cs">הזן קודים חדשים למאגר</div></div>
+    </div>
+    <div class="card-body">
+      <div class="g3">
+        <div class="field">
+          <label>כרטיס</label>
+          <input type="text" id="aCard" placeholder="מספר כרטיס">
+        </div>
+        <div class="field">
+          <label>קוד תדלוק <span class="req">*</span></label>
+          <input type="text" id="aCode" placeholder="הקוד">
+        </div>
+        <div class="field">
+          <label>ערך (₪) <span class="req">*</span></label>
+          <input type="number" id="aVal" placeholder="200">
+        </div>
+      </div>
+      <div class="g2">
+        <div class="field">
+          <label>סוג דלק</label>
+          <select id="aFuel">
+            <option>בנזין</option>
+            <option>סולר</option>
+            <option>אחר</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>הערות</label>
+          <input type="text" id="aNotes" placeholder="אופציונלי">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-steel" onclick="addCode()">➕ הוסף קוד</button>
+        <button class="btn btn-outline" onclick="openBulkModal()">📋 הוספה מרובה</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr">
+      <span class="ci">🗂️</span>
+      <div><div class="ct">מאגר קודים</div><div class="cs">כל הקודים במערכת</div></div>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div style="padding:14px 16px;display:flex;gap:10px;border-bottom:1px solid var(--border);">
+        <input type="text" id="codeSearch" placeholder="חיפוש לפי קוד / כרטיס / עובד..." style="flex:1;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:14px;direction:rtl;">
+        <select id="codeFilter" onchange="renderCodesTable()" style="padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-size:14px;direction:rtl;">
+          <option value="">הכל</option>
+          <option value="פנוי">פנוי</option>
+          <option value="נופק">נופק</option>
+          <option value="מבוטל">מבוטל</option>
+        </select>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>כרטיס</th><th>קוד</th><th>ערך</th><th>דלק</th>
+            <th>סטטוס</th><th>עובד</th><th>תאריך</th><th>פעולות</th>
+          </tr></thead>
+          <tbody id="codesBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: LOG
+══════════════════════════════════════ -->
+<div class="tab" id="tab-log">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="font-size:16px;font-weight:800;color:var(--ink);">📋 יומן ניפוקים</div>
+    <button class="btn btn-wa btn-sm" onclick="shareFullLog()">📲 שתף סיכום</button>
+  </div>
+  <div id="logList"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: REPORT
+══════════════════════════════════════ -->
+<div class="tab" id="tab-report">
+
+  <div class="kpi-grid" id="reportKPIs"></div>
+
+  <div class="card">
+    <div class="card-hdr"><span class="ci">📊</span><div><div class="ct">דוח חודשי</div></div></div>
+    <div class="card-body">
+      <div class="field" style="margin-bottom:16px">
+        <label>בחר חודש</label>
+        <input type="month" id="reportMonth" onchange="renderReport()">
+      </div>
+      <div id="reportContent"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TAB: SETTINGS
+══════════════════════════════════════ -->
+<div class="tab" id="tab-settings">
+  <div class="card">
+    <div class="card-hdr"><span class="ci">⚙️</span><div><div class="ct">הגדרות מערכת</div></div></div>
+    <div class="card-body">
+      <div class="g2">
+        <div class="field">
+          <label>מלאי מינימלי להתראה</label>
+          <input type="number" id="sMinStock" placeholder="10" min="1">
+        </div>
+        <div class="field">
+          <label>ערך ברירת מחדל (₪)</label>
+          <input type="number" id="sDefVal" placeholder="200">
+        </div>
+      </div>
+      <div class="field">
+        <label>מנהלי מערכת (מיילים, פסיק)</label>
+        <textarea id="sAdmins" placeholder="admin@example.com, manager@example.com"></textarea>
+      </div>
+      <div class="field">
+        <label>משתמשים מורשים לניפוק (מיילים, פסיק)</label>
+        <textarea id="sUsers" placeholder="user1@example.com, user2@example.com"></textarea>
+      </div>
+      <div class="field">
+        <label>נוסח הודעת WhatsApp</label>
+        <textarea id="sWaTemplate" style="min-height:120px">שלום {שם_עובד},
+נופק עבורך קוד תדלוק בסך {ערך} ₪.
+מספר רכב: {רישוי}
+סוג דלק: {סוג_דלק}
+קוד תדלוק: {קוד}
+נא להשתמש בקוד בהתאם לצורך.
+תודה.</textarea>
+      </div>
+      <div class="field">
+        <label>קישור Google Sheets (לייבוא/ייצוא)</label>
+        <input type="url" id="sSheetUrl" value="https://docs.google.com/spreadsheets/d/1mT_YPoy1nbcq9v8jLinC6UJ0n_WuKXN1jmkHxa1eDHQ/edit">
+        <div class="hint">הגיליון שהוגדר: קישור לייצוא נתונים ידני</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-steel" onclick="saveSettings()">💾 שמור הגדרות</button>
+        <button class="btn btn-outline" onclick="openSheetLink()">🔗 פתח גיליון</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hdr"><span class="ci">📤</span><div><div class="ct">ייצוא נתונים</div></div></div>
+    <div class="card-body">
+      <p style="font-size:13px;color:var(--muted);margin-bottom:14px">ייצא את הנתונים לפורמט CSV להעתקה לגיליון Google Sheets.</p>
+      <div class="btn-row">
+        <button class="btn btn-outline" onclick="exportCSV('codes')">📥 ייצא קודים</button>
+        <button class="btn btn-outline" onclick="exportCSV('log')">📥 ייצא יומן</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ── BULK MODAL ── -->
+<div class="modal-overlay" id="bulkModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">📋 הוספת קודים מרובה</div>
+    <div class="field">
+      <label>הדבק קודים (שורה לכל קוד: כרטיס,קוד,ערך,סוג)</label>
+      <textarea id="bulkInput" style="min-height:140px;font-family:monospace" placeholder="K001,FUEL-1234,200,בנזין&#10;K002,FUEL-5678,200,סולר&#10;K003,FUEL-9999,200,בנזין"></textarea>
+      <div class="hint">פורמט: כרטיס,קוד,ערך,סוגדלק – שורה אחת לכל קוד</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-steel" onclick="addBulk()">➕ הוסף הכל</button>
+      <button class="btn btn-outline" onclick="closeBulkModal()">ביטול</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ══════════════════════════════════════
+// STATE
+// ══════════════════════════════════════
+const KEY_CODES = 'fms_codes';
+const KEY_LOG   = 'fms_log';
+const KEY_CFG   = 'fms_cfg';
+
+let codes    = JSON.parse(localStorage.getItem(KEY_CODES) || '[]');
+let logItems = JSON.parse(localStorage.getItem(KEY_LOG)   || '[]');
+let cfg      = JSON.parse(localStorage.getItem(KEY_CFG)   || 'null') || {
+  minStock: 10,
+  defVal: 200,
+  admins: '',
+  users: '',
+  waTemplate: `שלום {שם_עובד},\nנופק עבורך קוד תדלוק בסך {ערך} ₪.\nמספר רכב: {רישוי}\nסוג דלק: {סוג_דלק}\nקוד תדלוק: {קוד}\nנא להשתמש בקוד בהתאם לצורך.\nתודה.`,
+  sheetUrl: 'https://docs.google.com/spreadsheets/d/1mT_YPoy1nbcq9v8jLinC6UJ0n_WuKXN1jmkHxa1eDHQ/edit'
+};
+
+// pending dispense when dup-warning shown
+let _pending = null;
+
+// ══════════════════════════════════════
+// SAVE
+// ══════════════════════════════════════
+function save() {
+  localStorage.setItem(KEY_CODES, JSON.stringify(codes));
+  localStorage.setItem(KEY_LOG,   JSON.stringify(logItems));
+  localStorage.setItem(KEY_CFG,   JSON.stringify(cfg));
+}
+
+// ══════════════════════════════════════
+// INIT
+// ══════════════════════════════════════
+function init() {
+  // Settings UI
+  document.getElementById('sMinStock').value   = cfg.minStock;
+  document.getElementById('sDefVal').value      = cfg.defVal;
+  document.getElementById('sAdmins').value      = cfg.admins;
+  document.getElementById('sUsers').value       = cfg.users;
+  document.getElementById('sWaTemplate').value  = cfg.waTemplate;
+  document.getElementById('sSheetUrl').value    = cfg.sheetUrl;
+  // Month default
+  const now = new Date();
+  document.getElementById('reportMonth').value  =
+    now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+  // Code search listener
+  document.getElementById('codeSearch').addEventListener('input', renderCodesTable);
+  updateHeader();
+  checkLowStock();
+  renderCodesTable();
+  renderLog();
+  renderReport();
+}
+
+// ══════════════════════════════════════
+// TABS
+// ══════════════════════════════════════
+function showTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('on'));
+  document.getElementById('tab-'+id).classList.add('on');
+  btn.classList.add('on');
+  if (id === 'codes')   renderCodesTable();
+  if (id === 'log')     renderLog();
+  if (id === 'report')  renderReport();
+}
+
+// ══════════════════════════════════════
+// HEADER STATS
+// ══════════════════════════════════════
+function updateHeader() {
+  const free = codes.filter(c => c.status === 'פנוי').length;
+  const used = codes.filter(c => c.status === 'נופק').length;
+  const val  = codes.filter(c => c.status === 'נופק').reduce((s,c)=>s+Number(c.value),0);
+  document.getElementById('statFree').textContent = free;
+  document.getElementById('statUsed').textContent = used;
+  document.getElementById('statVal').textContent  = val.toLocaleString();
+}
+
+function checkLowStock() {
+  const free = codes.filter(c => c.status === 'פנוי').length;
+  const el   = document.getElementById('lowStockAlert');
+  if (free < cfg.minStock) {
+    document.getElementById('lowStockMsg').textContent =
+      `⚠️ נותרו ${free} קודי תדלוק פנויים בלבד. מומלץ למשוך קודים נוספים.`;
+    el.classList.add('show');
+  } else {
+    el.classList.remove('show');
+  }
+}
+
+// ══════════════════════════════════════
+// DISPENSE
+// ══════════════════════════════════════
+function dispenseCode() {
+  hideResults();
+  const licPerm = v('dLicPerm');
+  const worker  = v('dWorker');
+  const phone   = v('dPhone');
+  const fuel    = v('dFuelType');
+  if (!licPerm || !worker || !phone || !fuel) {
+    showErr('dispError', 'dispErrorMsg', 'נא למלא את כל שדות החובה.');
+    return;
+  }
+  // Duplicate check
+  const today = dateStr();
+  const dup = logItems.find(l =>
+    l.action === 'ניפוק' &&
+    (l.licPerm === licPerm || (l.licAlt && l.licAlt === v('dLicAlt'))) &&
+    l.date === today
+  );
+  if (dup) {
+    _pending = buildPending();
+    document.getElementById('dupMsg').textContent =
+      `כבר נופק היום קוד לרכב ${licPerm} (קוד: ${dup.code}). האם להמשיך?`;
+    document.getElementById('dupWarning').classList.add('show');
+    return;
+  }
+  doDispense(buildPending());
+}
+
+function buildPending() {
+  return {
+    licPerm: v('dLicPerm'), licAlt: v('dLicAlt'),
+    worker: v('dWorker'), phone: v('dPhone'),
+    fuel: v('dFuelType'), operator: v('dOperator'),
+    notes: v('dNotes')
+  };
+}
+
+function forceDispense() {
+  document.getElementById('dupWarning').classList.remove('show');
+  if (_pending) doDispense(_pending);
+  _pending = null;
+}
+
+function cancelDispense() {
+  document.getElementById('dupWarning').classList.remove('show');
+  _pending = null;
+}
+
+function doDispense(p) {
+  const avail = codes.filter(c => c.status === 'פנוי');
+  if (!avail.length) {
+    showErr('dispError', 'dispErrorMsg', 'אין קודי תדלוק פנויים במאגר!');
+    return;
+  }
+  // Find first free
+  const idx   = codes.indexOf(avail[0]);
+  const code  = codes[idx];
+  const opId  = 'OP-' + Date.now();
+  const now   = new Date();
+  const ts    = now.toLocaleString('he-IL');
+
+  code.status   = 'נופק';
+  code.worker   = p.worker;
+  code.phone    = p.phone;
+  code.licPerm  = p.licPerm;
+  code.licAlt   = p.licAlt;
+  code.fuel     = p.fuel || code.fuel;
+  code.date     = dateStr();
+  code.ts       = ts;
+  code.operator = p.operator;
+  code.notes    = p.notes;
+  code.opId     = opId;
+  code.waLink   = buildWaLink(code, p);
+
+  // Log entry
+  logItems.unshift({
+    action: 'ניפוק', code: code.code, card: code.card,
+    value: code.value, fuel: code.fuel,
+    licPerm: p.licPerm, licAlt: p.licAlt,
+    worker: p.worker, phone: p.phone,
+    operator: p.operator, notes: p.notes,
+    date: dateStr(), ts, opId, waLink: code.waLink
+  });
+
+  save();
+  updateHeader();
+  checkLowStock();
+
+  // Show result
+  const r = document.getElementById('dispResult');
+  r.classList.add('show');
+  document.getElementById('dispCode').textContent   = code.code;
+  document.getElementById('dispCard').textContent   = code.card || '—';
+  document.getElementById('dispVal').textContent    = '₪' + code.value;
+  document.getElementById('dispFuel').textContent   = code.fuel;
+  document.getElementById('dispLic').textContent    = p.licPerm + (p.licAlt ? ' / '+p.licAlt : '');
+  document.getElementById('dispWorker').textContent = p.worker;
+  document.getElementById('dispId').textContent     = opId;
+  document.getElementById('dispWaBtn').onclick      = () => window.open(code.waLink, '_blank');
+
+  showToast('✅ קוד נופק: ' + code.code, 'ok');
+  clearDispForm();
+}
+
+function clearDispForm() {
+  ['dLicPerm','dLicAlt','dWorker','dPhone','dNotes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('dFuelType').selectedIndex = 0;
+}
+
+function hideResults() {
+  ['dispResult','dupWarning','dispError'].forEach(id => {
+    document.getElementById(id).classList.remove('show');
+  });
+}
+
+function buildWaLink(code, p) {
+  let phone = (p.phone || '').replace(/\D/g,'');
+  if (phone.startsWith('0')) phone = '972' + phone.slice(1);
+  const msg = (cfg.waTemplate || '')
+    .replace('{שם_עובד}', p.worker)
+    .replace('{ערך}', code.value)
+    .replace('{רישוי}', p.licPerm + (p.licAlt ? ' / '+p.licAlt : ''))
+    .replace('{סוג_דלק}', p.fuel || code.fuel)
+    .replace('{קוד}', code.code);
+  return 'https://wa.me/' + phone + '?text=' + encodeURIComponent(msg);
+}
+
+// ══════════════════════════════════════
+// ADD CODES
+// ══════════════════════════════════════
+function addCode() {
+  const code = v('aCode');
+  const val  = v('aVal');
+  if (!code || !val) { showToast('⚠️ קוד וערך הם שדות חובה', 'err'); return; }
+  if (codes.find(c => c.code === code)) {
+    showToast('⚠️ קוד זה כבר קיים במאגר', 'err'); return;
+  }
+  codes.push({
+    card: v('aCard'), code, value: Number(val),
+    fuel: v('aFuel') || 'בנזין',
+    notes: v('aNotes'), status: 'פנוי',
+    worker:'', phone:'', licPerm:'', licAlt:'',
+    date:'', ts:'', operator:'', opId:'', waLink:''
+  });
+  save(); updateHeader(); checkLowStock();
+  ['aCard','aCode','aVal','aNotes'].forEach(id => document.getElementById(id).value='');
+  showToast('✅ קוד ' + code + ' נוסף', 'ok');
+  renderCodesTable();
+}
+
+function addBulk() {
+  const lines = document.getElementById('bulkInput').value.trim().split('\n');
+  let added = 0, skip = 0;
+  lines.forEach(line => {
+    const parts = line.split(',').map(s=>s.trim());
+    if (parts.length < 2) return;
+    const [card, code, val, fuel] = parts;
+    if (!code) return;
+    if (codes.find(c => c.code === code)) { skip++; return; }
+    codes.push({
+      card: card||'', code, value: Number(val)||cfg.defVal,
+      fuel: fuel||'בנזין', notes:'', status:'פנוי',
+      worker:'', phone:'', licPerm:'', licAlt:'',
+      date:'', ts:'', operator:'', opId:'', waLink:''
+    });
+    added++;
+  });
+  save(); updateHeader(); checkLowStock(); renderCodesTable();
+  closeBulkModal();
+  showToast(`✅ נוספו ${added} קודים${skip?' ('+skip+' כפולים דולגו)':''}`, 'ok');
+}
+
+function openBulkModal()  { document.getElementById('bulkModal').classList.add('open'); }
+function closeBulkModal() { document.getElementById('bulkModal').classList.remove('open'); }
+
+// ══════════════════════════════════════
+// CODES TABLE
+// ══════════════════════════════════════
+function renderCodesTable() {
+  const q   = (document.getElementById('codeSearch').value||'').toLowerCase();
+  const flt = document.getElementById('codeFilter').value;
+  const rows = codes.filter(c => {
+    const match = !q ||
+      c.code.toLowerCase().includes(q) ||
+      (c.card||'').toLowerCase().includes(q) ||
+      (c.worker||'').toLowerCase().includes(q);
+    const statusMatch = !flt || c.status === flt;
+    return match && statusMatch;
+  });
+  const tbody = document.getElementById('codesBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px">אין קודים תואמים</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((c,i) => {
+    const realIdx = codes.indexOf(c);
+    const badgeCls = {פנוי:'b-free',נופק:'b-used',מבוטל:'b-cancel','פג תוקף':'b-expire'}[c.status]||'b-free';
+    return `<tr>
+      <td>${c.card||'—'}</td>
+      <td class="td-code">${c.code}</td>
+      <td>₪${c.value}</td>
+      <td>${c.fuel||'—'}</td>
+      <td><span class="badge ${badgeCls}">${c.status}</span></td>
+      <td>${c.worker||'—'}</td>
+      <td>${c.date||'—'}</td>
+      <td>
+        ${c.status==='פנוי'?`<button class="btn btn-danger btn-sm" onclick="cancelCode(${realIdx})">🚫 בטל</button>`:''}
+        ${c.waLink?`<a href="${c.waLink}" target="_blank" style="margin-right:6px;font-size:12px;color:var(--ok);font-weight:700">📲 WA</a>`:''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function cancelCode(idx) {
+  if (!confirm('לבטל קוד זה?')) return;
+  codes[idx].status = 'מבוטל';
+  logItems.unshift({
+    action:'ביטול', code:codes[idx].code, card:codes[idx].card,
+    value:codes[idx].value, fuel:codes[idx].fuel,
+    licPerm:codes[idx].licPerm, worker:codes[idx].worker,
+    date:dateStr(), ts:new Date().toLocaleString('he-IL'),
+    opId:'CX-'+Date.now()
+  });
+  save(); updateHeader(); renderCodesTable(); renderLog();
+  showToast('🚫 קוד בוטל', 'ok');
+}
+
+// ══════════════════════════════════════
+// LOG
+// ══════════════════════════════════════
+function renderLog() {
+  const el = document.getElementById('logList');
+  if (!logItems.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">📋</div><div>אין פעולות ביומן עדיין</div></div>';
+    return;
+  }
+  el.innerHTML = logItems.map((l,i) => {
+    const badgeCls = l.action==='ניפוק'?'b-used':l.action==='ביטול'?'b-cancel':'b-free';
+    return `<div class="log-item">
+      <div class="log-head">
+        <span class="log-code">${l.code}</span>
+        <span class="badge ${badgeCls}">${l.action}</span>
+      </div>
+      <div class="log-meta">👤 ${l.worker||'—'} | 🚗 ${l.licPerm||'—'} | ⛽ ${l.fuel||'—'} | 💰 ₪${l.value||'—'}</div>
+      <div class="log-meta">📅 ${l.ts||l.date} | 🆔 ${l.opId||'—'}</div>
+      ${l.waLink?`<div style="margin-top:6px"><a href="${l.waLink}" target="_blank" class="btn btn-wa btn-sm" style="display:inline-flex;width:auto">📲 WhatsApp</a></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function shareFullLog() {
+  const used = logItems.filter(l=>l.action==='ניפוק');
+  let msg = `⛽ *סיכום ניפוקי תדלוק*\n📅 ${new Date().toLocaleDateString('he-IL')}\n\n`;
+  msg += `✅ סה״כ נופקו: ${used.length} קודים\n`;
+  msg += `💰 שווי: ₪${used.reduce((s,l)=>s+Number(l.value||0),0).toLocaleString()}\n\n`;
+  used.slice(0,10).forEach(l => {
+    msg += `• ${l.code} | ${l.worker||'—'} | 🚗${l.licPerm||'—'} | ${l.date}\n`;
+  });
+  if (used.length>10) msg += `...ועוד ${used.length-10} ניפוקים\n`;
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+
+// ══════════════════════════════════════
+// REPORT
+// ══════════════════════════════════════
+function renderReport() {
+  const month = document.getElementById('reportMonth').value; // YYYY-MM
+  const mLogs = logItems.filter(l => l.date && l.date.startsWith(month.replace('-','/')||month));
+  // Actually match by date prefix
+  const allUsed = codes.filter(c=>c.status==='נופק');
+  const free    = codes.filter(c=>c.status==='פנוי').length;
+  const total   = codes.length;
+  const cancel  = codes.filter(c=>c.status==='מבוטל').length;
+  const usedVal = allUsed.reduce((s,c)=>s+Number(c.value),0);
+  const freeVal = codes.filter(c=>c.status==='פנוי').reduce((s,c)=>s+Number(c.value),0);
+
+  // Month dispenses
+  const monthUsed = logItems.filter(l=>l.action==='ניפוק' && (l.date||'').slice(0,7).replace('/','-')===month);
+
+  // KPIs
+  document.getElementById('reportKPIs').innerHTML = `
+    <div class="kpi accent"><div class="kv">${total}</div><div class="kl">סה״כ קודים</div></div>
+    <div class="kpi"><div class="kv" style="color:var(--ok)">${free}</div><div class="kl">פנויים</div><div class="km">₪${freeVal.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kv" style="color:var(--steel)">${allUsed.length}</div><div class="kl">נופקו</div><div class="km">₪${usedVal.toLocaleString()}</div></div>
+    <div class="kpi"><div class="kv" style="color:var(--err)">${cancel}</div><div class="kl">מבוטלים</div></div>
+  `;
+
+  // Worker breakdown
+  const byWorker = {};
+  monthUsed.forEach(l=>{
+    if(!l.worker) return;
+    byWorker[l.worker] = (byWorker[l.worker]||0) + 1;
+  });
+  const byVehicle = {};
+  monthUsed.forEach(l=>{
+    const k = l.licPerm||'—';
+    byVehicle[k] = (byVehicle[k]||0) + 1;
+  });
+  const byOp = {};
+  monthUsed.forEach(l=>{
+    const k = l.operator||'לא צוין';
+    byOp[k] = (byOp[k]||0) + 1;
+  });
+
+  // Duplicates in same day
+  const dayMap = {};
+  monthUsed.forEach(l=>{
+    const key = (l.licPerm||'')+'|'+(l.date||'');
+    dayMap[key] = (dayMap[key]||0)+1;
+  });
+  const dups = Object.entries(dayMap).filter(([,v])=>v>1);
+
+  let html = '';
+
+  html += `<div class="report-section">
+    <div class="report-title">סיכום חודש ${month}</div>
+    <div class="rep-row"><span class="rep-key">ניפוקים בחודש</span><span class="rep-val fuel">${monthUsed.length}</span></div>
+    <div class="rep-row"><span class="rep-key">שווי נופק</span><span class="rep-val">₪${monthUsed.reduce((s,l)=>s+Number(l.value||0),0).toLocaleString()}</span></div>
+    <div class="rep-row"><span class="rep-key">קודים פנויים</span><span class="rep-val">${free}</span></div>
+  </div>`;
+
+  if (Object.keys(byWorker).length) {
+    html += `<div class="report-section"><div class="report-title">ניפוקים לפי עובד</div>`;
+    Object.entries(byWorker).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+      html += `<div class="rep-row"><span class="rep-key">${k}</span><span class="rep-val">${v}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  if (Object.keys(byVehicle).length) {
+    html += `<div class="report-section"><div class="report-title">ניפוקים לפי רכב</div>`;
+    Object.entries(byVehicle).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+      html += `<div class="rep-row"><span class="rep-key">🚗 ${k}</span><span class="rep-val">${v}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  if (Object.keys(byOp).length) {
+    html += `<div class="report-section"><div class="report-title">ניפוקים לפי מנפיק</div>`;
+    Object.entries(byOp).sort((a,b)=>b[1]-a[1]).forEach(([k,v])=>{
+      html += `<div class="rep-row"><span class="rep-key">${k}</span><span class="rep-val">${v}</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  if (dups.length) {
+    html += `<div class="report-section"><div class="report-title" style="color:var(--err)">⚠️ חריגים – ניפוק כפול ביום</div>`;
+    dups.forEach(([key,cnt])=>{
+      const [lic,date] = key.split('|');
+      html += `<div class="rep-row"><span class="rep-key">🚗 ${lic} ב-${date}</span><span class="rep-val" style="color:var(--err)">${cnt} פעמים</span></div>`;
+    });
+    html += '</div>';
+  }
+
+  if (!html) html = '<div class="empty"><div class="ei">📊</div><div>אין נתונים לחודש זה</div></div>';
+  document.getElementById('reportContent').innerHTML = html;
+}
+
+// ══════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════
+function saveSettings() {
+  cfg.minStock    = Number(v('sMinStock')) || 10;
+  cfg.defVal      = Number(v('sDefVal'))   || 200;
+  cfg.admins      = v('sAdmins');
+  cfg.users       = v('sUsers');
+  cfg.waTemplate  = document.getElementById('sWaTemplate').value;
+  cfg.sheetUrl    = v('sSheetUrl');
+  save();
+  checkLowStock();
+  showToast('✅ הגדרות נשמרו', 'ok');
+}
+
+function openSheetLink() {
+  window.open(cfg.sheetUrl, '_blank');
+}
+
+// ══════════════════════════════════════
+// EXPORT CSV
+// ══════════════════════════════════════
+function exportCSV(type) {
+  let csv = '', filename = '';
+  if (type === 'codes') {
+    csv = 'כרטיס,קוד,ערך,סוג דלק,סטטוס,עובד,טלפון,רישוי קבוע,רישוי חליפי,תאריך,מנפיק,מזהה פעולה\n';
+    codes.forEach(c=>{
+      csv += [c.card,c.code,c.value,c.fuel,c.status,c.worker,c.phone,c.licPerm,c.licAlt,c.date,c.operator,c.opId]
+        .map(x=>`"${(x||'').toString().replace(/"/g,'""')}"`)
+        .join(',') + '\n';
+    });
+    filename = 'קודי_תדלוק.csv';
+  } else {
+    csv = 'תאריך,שעה,פעולה,קוד,ערך,סוג דלק,רישוי קבוע,עובד,טלפון,מנפיק,מזהה\n';
+    logItems.forEach(l=>{
+      csv += [l.ts,l.date,l.action,l.code,l.value,l.fuel,l.licPerm,l.worker,l.phone,l.operator,l.opId]
+        .map(x=>`"${(x||'').toString().replace(/"/g,'""')}"`)
+        .join(',') + '\n';
+    });
+    filename = 'יומן_ניפוקים.csv';
+  }
+  const bom = '\uFEFF';
+  const blob = new Blob([bom+csv], {type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 קובץ יוצא', 'ok');
+}
+
+// ══════════════════════════════════════
+// UTILS
+// ══════════════════════════════════════
+function v(id) { return (document.getElementById(id)||{}).value?.trim() || ''; }
+
+function dateStr() {
+  const d = new Date();
+  return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+}
+
+function showToast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show toast-'+(type==='ok'?'ok':'err');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+function showErr(boxId, msgId, msg) {
+  document.getElementById(boxId).classList.add('show');
+  document.getElementById(msgId).textContent = '❌ ' + msg;
+}
+
+// ══════════════════════════════════════
+// START
+// ══════════════════════════════════════
+init();
+</script>
+</body>
+</html>
